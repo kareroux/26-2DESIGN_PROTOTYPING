@@ -1,0 +1,10 @@
+{
+  "description": "Explore and compare private education participation rates across school levels and student, family, and regional characteristics through interactive visualizations.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
