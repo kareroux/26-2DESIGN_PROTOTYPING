@@ -16,6 +16,9 @@ body { margin: 0; color: var(--ink); font-family: 'DM Sans', 'Noto Sans KR', san
 main { overflow: hidden; }
 .topbar { height: 68px; padding: 0 5vw; border-bottom: 1px solid var(--ink); display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 700; letter-spacing: .1em; }
 .brand { background: var(--ink); color: var(--paper); padding: 8px 10px; }
+.view-nav { display: flex; gap: 4px; padding: 4px; border: 1px solid var(--ink); border-radius: 100px; letter-spacing: 0; }
+.view-nav div { padding: 7px 13px; border-radius: 100px; cursor: pointer; color: #77736a; }
+.view-nav div.active { background: var(--ink); color: var(--paper); }
 .hero { min-height: 610px; padding: 74px 5vw 58px; position: relative; border-bottom: 1px solid var(--ink); }
 .eyebrow, .kicker { font-size: 12px; font-weight: 700; letter-spacing: .14em; }
 .title { max-width: 900px; margin-top: 22px; font-family: 'Noto Sans KR', sans-serif; font-size: clamp(58px, 9vw, 130px); line-height: .98; font-weight: 900; letter-spacing: -.065em; }
@@ -73,7 +76,45 @@ main { overflow: hidden; }
 .heat { background: color-mix(in srgb, var(--coral) calc(var(--heat) * 100%), transparent); font-weight: 700; text-align: right; }
 footer { padding: 30px 5vw 50px; display: flex; justify-content: space-between; font-size: 11px; color: #77736a; }
 
+.sensor-page { min-height: calc(100vh - 68px); background: #1d1e19; color: #f3f0e8; padding: 58px 5vw 80px; }
+.sensor-intro { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 48px; }
+.sensor-title { margin-top: 18px; max-width: 780px; font-family: 'Noto Sans KR', sans-serif; font-size: clamp(46px, 7vw, 96px); line-height: 1.02; font-weight: 900; letter-spacing: -.065em; }
+.sensor-status { display: flex; align-items: center; gap: 9px; font-size: 12px; font-weight: 700; }
+.sensor-status i { width: 9px; height: 9px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 0 5px rgba(223,255,88,.14); }
+.sensor-status span { padding: 5px 8px; margin-left: 8px; color: #1d1e19; background: var(--lime); }
+.sensor-overview { display: grid; grid-template-columns: 1.15fr .85fr; border: 1px solid rgba(255,255,255,.28); }
+.current-light { min-height: 450px; padding: 34px; display: flex; flex-direction: column; border-right: 1px solid rgba(255,255,255,.28); background: radial-gradient(circle at 65% 35%, rgba(223,255,88,.18), transparent 42%); }
+.card-label { font-size: 12px; font-weight: 700; letter-spacing: .12em; color: #b7b8ae; }
+.lux-value { margin: auto 0; font-size: clamp(112px, 17vw, 230px); line-height: .75; font-weight: 600; letter-spacing: -.095em; }
+.lux-value small { margin-left: 20px; font-size: .12em; letter-spacing: .02em; color: var(--lime); }
+.light-state { display: flex; align-items: center; gap: 12px; font-size: 13px; color: #b7b8ae; }
+.light-state span { padding: 6px 10px; border: 1px solid var(--lime); color: var(--lime); border-radius: 100px; font-weight: 700; }
+.updated-at { margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,.18); font-size: 11px; color: #85877d; }
+.sensor-metrics { display: grid; grid-template-columns: 1fr 1fr; }
+.sensor-metrics > div { padding: 26px; display: flex; flex-direction: column; border-right: 1px solid rgba(255,255,255,.18); border-bottom: 1px solid rgba(255,255,255,.18); }
+.sensor-metrics > div:nth-child(even) { border-right: 0; }
+.sensor-metrics > div:nth-child(n+3) { border-bottom: 0; }
+.sensor-metrics span { font-size: 11px; color: #92948a; }
+.sensor-metrics strong { margin: auto 0 6px; font-size: clamp(28px, 4vw, 52px); letter-spacing: -.055em; }
+.sensor-metrics strong small { font-size: .34em; color: #92948a; }
+.sensor-metrics strong.up { color: var(--lime); }
+.sensor-metrics em { font-size: 11px; font-style: normal; color: #6f7168; }
+.sensor-trend { margin-top: 20px; padding: 32px; border: 1px solid rgba(255,255,255,.28); }
+.sensor-section-head { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; }
+.sensor-section-head span { font-size: 11px; color: var(--lime); font-weight: 700; letter-spacing: .12em; }
+.sensor-section-head div div { margin-top: 8px; font-family: 'Noto Sans KR', sans-serif; font-size: 28px; font-weight: 700; }
+.sensor-section-head p { margin: 0; font-size: 11px; color: #85877d; }
+.sensor-chart-scroll { overflow-x: auto; }
+.sensor-chart { width: 100%; min-width: 650px; }
+.sensor-gridline { stroke: rgba(255,255,255,.14); stroke-width: 1; }
+.sensor-axis { font-size: 10px; fill: #85877d; }
+.sensor-line { stroke: var(--lime); stroke-width: 3; stroke-linejoin: round; }
+.sensor-dot { fill: #1d1e19; stroke: var(--lime); stroke-width: 3; }
+
 @media (max-width: 760px) {
+  .topbar { padding: 0 4vw; }
+  .source { display: none; }
+  .view-nav { margin-left: auto; }
   .hero { min-height: 680px; padding-top: 54px; }
   .hero-stat { left: 5vw; right: auto; width: 90%; }
   .section { padding-top: 58px; padding-bottom: 58px; }
@@ -84,4 +125,10 @@ footer { padding: 30px 5vw 50px; display: flex; justify-content: space-between; 
   .matrix { overflow-x: auto; }
   .matrix-row { min-width: 620px; }
   footer { flex-direction: column; gap: 8px; }
+  .sensor-page { padding-top: 38px; }
+  .sensor-intro { display: grid; gap: 28px; }
+  .sensor-overview { grid-template-columns: 1fr; }
+  .current-light { min-height: 360px; border-right: 0; border-bottom: 1px solid rgba(255,255,255,.28); }
+  .lux-value { font-size: 120px; }
+  .sensor-trend { padding: 22px 16px; }
 }

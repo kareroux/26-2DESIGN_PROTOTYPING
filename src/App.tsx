@@ -13,6 +13,16 @@ const groups = [
 
 const latest = (row: (typeof rows)[number], stage = 0) => row.values[9][stage]
 const format = (value: number | null) => (value == null ? '—' : `${value.toFixed(1)}%`)
+const illuminance = [
+  { time: '06:00', value: 42 },
+  { time: '08:00', value: 180 },
+  { time: '10:00', value: 468 },
+  { time: '12:00', value: 782 },
+  { time: '14:00', value: 624 },
+  { time: '16:00', value: 391 },
+  { time: '18:00', value: 156 },
+  { time: '20:00', value: 68 },
+]
 
 function LineChart({ rowIndex = 0, min = 45, max = 95, ticks = [50, 60, 70, 80, 90] }: {
   rowIndex?: number
@@ -74,8 +84,88 @@ function ComparisonBars({ indices }: { indices: number[] }) {
   )
 }
 
+function SensorLineChart() {
+  const width = 800
+  const height = 300
+  const left = 48
+  const top = 22
+  const chartW = 720
+  const chartH = 220
+  const x = (i: number) => left + (i / (illuminance.length - 1)) * chartW
+  const y = (value: number) => top + chartH - (value / 900) * chartH
+  const points = illuminance.map((item, i) => `${x(i)},${y(item.value)}`).join(' ')
+
+  return (
+    <div className="sensor-chart-scroll">
+      <svg viewBox={`0 0 ${width} ${height}`} className="sensor-chart" aria-label="시간대별 조도 변화 예시">
+        <defs>
+          <linearGradient id="lightArea" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#dfff58" stopOpacity=".5" />
+            <stop offset="100%" stopColor="#dfff58" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {[0, 300, 600, 900].map((tick) => (
+          <g key={tick}>
+            <line x1={left} x2={left + chartW} y1={y(tick)} y2={y(tick)} className="sensor-gridline" />
+            <text x={left - 10} y={y(tick) + 4} textAnchor="end" className="sensor-axis">{tick}</text>
+          </g>
+        ))}
+        <polygon points={`${left},${top + chartH} ${points} ${left + chartW},${top + chartH}`} fill="url(#lightArea)" />
+        <polyline points={points} fill="none" className="sensor-line" />
+        {illuminance.map((item, i) => (
+          <g key={item.time}>
+            <circle cx={x(i)} cy={y(item.value)} r="4.5" className="sensor-dot" />
+            <text x={x(i)} y={274} textAnchor="middle" className="sensor-axis">{item.time}</text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  )
+}
+
+function SensorDashboard() {
+  return (
+    <div className="sensor-page">
+      <section className="sensor-intro">
+        <div>
+          <div className="eyebrow">ILLUMINANCE MONITOR</div>
+          <div className="sensor-title">빛의 변화를<br />실시간으로 읽다</div>
+        </div>
+        <div className="sensor-status"><i /> 센서 온라인 <span>예시 데이터</span></div>
+      </section>
+
+      <section className="sensor-overview">
+        <div className="current-light">
+          <div className="card-label">현재 조도</div>
+          <div className="lux-value">468<small>lux</small></div>
+          <div className="light-state"><span>쾌적</span> 실내 업무에 적절한 밝기입니다</div>
+          <div className="updated-at">마지막 업데이트 · 오늘 10:24:18</div>
+        </div>
+        <div className="sensor-metrics">
+          <div><span>오늘 최고</span><strong>782 <small>lux</small></strong><em>12:00</em></div>
+          <div><span>오늘 최저</span><strong>42 <small>lux</small></strong><em>06:00</em></div>
+          <div><span>일 평균</span><strong>339 <small>lux</small></strong><em>현재까지</em></div>
+          <div><span>전 시간 대비</span><strong className="up">+18.4<small>%</small></strong><em>밝아지는 중</em></div>
+        </div>
+      </section>
+
+      <section className="sensor-trend">
+        <div className="sensor-section-head">
+          <div>
+            <span>오늘의 변화</span>
+            <div>시간대별 조도</div>
+          </div>
+          <p>06:00—20:00 · 2시간 간격</p>
+        </div>
+        <SensorLineChart />
+      </section>
+    </div>
+  )
+}
+
 function App() {
   const [activeGroup, setActiveGroup] = useState(0)
+  const [view, setView] = useState<'education' | 'sensor'>('education')
   const overall = rows[0]
   const academic = rows[7]
   const change = (latest(overall) ?? 0) - (overall.values[0][0] ?? 0)
@@ -85,9 +175,27 @@ function App() {
     <main>
       <header className="topbar">
         <div className="brand">DATA NOTE 25</div>
-        <div className="source">통계청 · 2016—2025</div>
+        <nav className="view-nav" aria-label="대시보드 화면">
+          <div
+            role="button"
+            tabIndex={0}
+            className={view === 'education' ? 'active' : ''}
+            onClick={() => setView('education')}
+            onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setView('education') }}
+          >사교육 통계</div>
+          <div
+            role="button"
+            tabIndex={0}
+            className={view === 'sensor' ? 'active' : ''}
+            onClick={() => setView('sensor')}
+            onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setView('sensor') }}
+          >조도 센서</div>
+        </nav>
+        <div className="source">{view === 'education' ? '통계청 · 2016—2025' : 'SENSOR 01 · LIVE'}</div>
       </header>
 
+      {view === 'sensor' ? <SensorDashboard /> : (
+      <>
       <section className="hero">
         <div className="eyebrow">PRIVATE EDUCATION PARTICIPATION</div>
         <div className="title">10년간의<br /><em>사교육 참여율</em></div>
@@ -205,6 +313,8 @@ function App() {
         <div>자료: 통계청 「초중고사교육비조사」</div>
         <div>단위: % · ‘—’는 해당 값 없음</div>
       </footer>
+      </>
+      )}
     </main>
   )
 }
