@@ -24,8 +24,16 @@
   .dot.live{background:#3ddc84; box-shadow:0 0 10px #3ddc8488}
   .card{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:28px 30px; margin-bottom:16px}
   .label{font-size:12px; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); margin-bottom:10px}
-  .value{font-size:88px; line-height:1; font-weight:500; font-variant-numeric:tabular-nums; transition:color .2s}
-  .time{font-size:13px; color:var(--dim); margin-top:12px; font-variant-numeric:tabular-nums}
+  .row{display:flex; align-items:center; justify-content:space-between; gap:20px}
+  .value{font-size:88px; line-height:1; font-weight:500; font-variant-numeric:tabular-nums}
+  .pct{font-size:40px; color:var(--dim); margin-left:4px}
+  .badge{
+    font-size:14px; letter-spacing:.08em; text-transform:uppercase;
+    padding:9px 18px; border-radius:999px; border:1px solid var(--line);
+    color:var(--dim); white-space:nowrap; transition:all .2s;
+  }
+  .badge.on{background:var(--accent); border-color:var(--accent); color:#1a1205}
+  .time{font-size:13px; color:var(--dim); margin-top:14px; font-variant-numeric:tabular-nums}
   .chart{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:20px}
   svg{display:block; width:100%; height:220px}
   .count{font-size:12px; color:var(--dim); margin-top:10px; text-align:right}
@@ -34,13 +42,16 @@
 <body>
 <div class="wrap">
   <div class="top">
-    <h1>SENSOR · REALTIME</h1>
+    <h1>BUTTON · REALTIME</h1>
     <div class="status"><span class="dot" id="dot"></span><span id="statusText">connecting…</span></div>
   </div>
 
   <div class="card">
-    <div class="label">current value</div>
-    <div class="value" id="value">—</div>
+    <div class="label">current level</div>
+    <div class="row">
+      <div><span class="value" id="value">—</span><span class="pct">%</span></div>
+      <div class="badge" id="badge">released</div>
+    </div>
     <div class="time" id="time">waiting for data</div>
   </div>
 
@@ -59,9 +70,11 @@ const SUPABASE_URL = "https://wrnwmxpyxhyksyzggtpn.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_lUc9MEmmeo6dvzX7BmJiKQ_h8yReFRr";
 
 const MAX_POINTS = 100;
+const PRESSED_AT = 0.5;
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const elValue = document.getElementById("value");
+const elBadge = document.getElementById("badge");
 const elTime = document.getElementById("time");
 const elCount = document.getElementById("count");
 const elLine = document.getElementById("line");
@@ -70,27 +83,35 @@ const elDot = document.getElementById("dot");
 const elStatus = document.getElementById("statusText");
 
 let points = [];
+let lastStamp = null;
+
+// Rows written before the button rig held raw 0-1023 readings.
+function normalise(v) {
+  return v > 1.5 ? v / 1023 : v;
+}
 
 function draw() {
   if (points.length < 2) return;
-  const W = 700, H = 220, PAD = 10;
-  const lo = Math.min(...points), hi = Math.max(...points);
-  const span = (hi - lo) || 1;
+  const W = 700, H = 220, PAD = 12;
   const coords = points.map((v, i) => {
     const x = (i / (points.length - 1)) * W;
-    const y = H - PAD - ((v - lo) / span) * (H - PAD * 2);
+    const y = H - PAD - v * (H - PAD * 2);
     return x.toFixed(1) + "," + y.toFixed(1);
   });
   elLine.setAttribute("points", coords.join(" "));
   elArea.setAttribute("points", "0," + H + " " + coords.join(" ") + " " + W + "," + H);
 }
 
-let lastStamp = null;
-
 function push(v, stamp) {
-  points.push(v);
+  const lv = Math.max(0, Math.min(1, normalise(v)));
+  points.push(lv);
   if (points.length > MAX_POINTS) points.shift();
-  elValue.textContent = Number(v).toFixed(0);
+
+  elValue.textContent = Math.round(lv * 100);
+  const pressed = lv > PRESSED_AT;
+  elBadge.textContent = pressed ? "pressed" : "released";
+  elBadge.classList.toggle("on", pressed);
+
   lastStamp = new Date(stamp);
   elCount.textContent = points.length + " readings";
   draw();
@@ -109,7 +130,7 @@ setInterval(() => {
   const stale = Date.now() - lastStamp.getTime() > 5000;
   elTime.textContent = "last reading " + ago(lastStamp);
   elDot.classList.toggle("live", !stale);
-  elStatus.textContent = stale ? "no sensor connected" : "receiving";
+  elStatus.textContent = stale ? "no board connected" : "receiving";
 }, 1000);
 
 async function loadHistory() {
@@ -133,9 +154,7 @@ db.channel("readings-stream")
         if (payload.new.value !== null) push(payload.new.value, payload.new.created_at);
       })
   .subscribe(status => {
-    if (status === "SUBSCRIBED") {
-      elStatus.textContent = "connected";
-    }
+    if (status === "SUBSCRIBED") elStatus.textContent = "connected";
   });
 
 loadHistory();
