@@ -85,14 +85,32 @@ function draw() {
   elArea.setAttribute("points", "0," + H + " " + coords.join(" ") + " " + W + "," + H);
 }
 
+let lastStamp = null;
+
 function push(v, stamp) {
   points.push(v);
   if (points.length > MAX_POINTS) points.shift();
   elValue.textContent = Number(v).toFixed(0);
-  elTime.textContent = new Date(stamp).toLocaleTimeString("ko-KR");
+  lastStamp = new Date(stamp);
   elCount.textContent = points.length + " readings";
   draw();
 }
+
+function ago(d) {
+  const s = Math.round((Date.now() - d.getTime()) / 1000);
+  if (s < 60) return s + "s ago";
+  if (s < 3600) return Math.round(s / 60) + "m ago";
+  if (s < 86400) return Math.round(s / 3600) + "h ago";
+  return Math.round(s / 86400) + "d ago";
+}
+
+setInterval(() => {
+  if (!lastStamp) return;
+  const stale = Date.now() - lastStamp.getTime() > 5000;
+  elTime.textContent = "last reading " + ago(lastStamp);
+  elDot.classList.toggle("live", !stale);
+  elStatus.textContent = stale ? "no sensor connected" : "receiving";
+}, 1000);
 
 async function loadHistory() {
   const { data, error } = await db
@@ -116,8 +134,7 @@ db.channel("readings-stream")
       })
   .subscribe(status => {
     if (status === "SUBSCRIBED") {
-      elDot.classList.add("live");
-      elStatus.textContent = "live";
+      elStatus.textContent = "connected";
     }
   });
 
