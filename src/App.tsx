@@ -3,7 +3,7 @@ import ConnectionControl from './components/ConnectionControl'
 import PowerToggle from './components/PowerToggle'
 import ProductHeader from './components/ProductHeader'
 import SensorChart from './components/SensorChart'
-import SensorMoon from './components/SensorMoon'
+import SensorFish from './components/SensorFish'
 import {
   connectSensor,
   disconnectSensor,
@@ -65,7 +65,7 @@ function App() {
   return (
     <main className="app-shell">
       <ProductHeader />
-      <SensorMoon value={latestValue} power={power} />
+      <SensorFish value={latestValue} power={power} />
 
       <div className="dashboard-grid">
         <section className="controls" aria-label="조명 제어">
