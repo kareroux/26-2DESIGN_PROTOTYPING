@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sensor Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#0e0f13; --card:#17191f; --line:#262933;
+    --fg:#f2f3f5; --dim:#8b8f9a; --accent:#ff9329;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; min-height:100vh; background:var(--bg); color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo",sans-serif;
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .wrap{width:100%; max-width:760px}
+  .top{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:16px}
+  h1{font-size:15px; font-weight:500; letter-spacing:.02em; margin:0; color:var(--dim)}
+  .status{font-size:13px; color:var(--dim); display:flex; align-items:center; gap:7px}
+  .dot{width:8px; height:8px; border-radius:50%; background:#444; transition:background .3s}
+  .dot.live{background:#3ddc84; box-shadow:0 0 10px #3ddc8488}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:28px 30px; margin-bottom:16px}
+  .label{font-size:12px; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); margin-bottom:10px}
+  .row{display:flex; align-items:center; justify-content:space-between; gap:20px}
+  .value{font-size:88px; line-height:1; font-weight:500; font-variant-numeric:tabular-nums}
+  .pct{font-size:40px; color:var(--dim); margin-left:4px}
+  .badge{
+    font-size:14px; letter-spacing:.08em; text-transform:uppercase;
+    padding:9px 18px; border-radius:999px; border:1px solid var(--line);
+    color:var(--dim); white-space:nowrap; transition:all .2s;
+  }
+  .badge.on{background:var(--accent); border-color:var(--accent); color:#1a1205}
+  .time{font-size:13px; color:var(--dim); margin-top:14px; font-variant-numeric:tabular-nums}
+  .chart{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:20px}
+  svg{display:block; width:100%; height:220px}
+  .count{font-size:12px; color:var(--dim); margin-top:10px; text-align:right}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1>BUTTON · REALTIME</h1>
+    <div class="status"><span class="dot" id="dot"></span><span id="statusText">connecting…</span></div>
+  </div>
+
+  <div class="card">
+    <div class="label">current level</div>
+    <div class="row">
+      <div><span class="value" id="value">—</span><span class="pct">%</span></div>
+      <div class="badge" id="badge">released</div>
+    </div>
+    <div class="time" id="time">waiting for data</div>
+  </div>
+
+  <div class="chart">
+    <svg id="svg" viewBox="0 0 700 220" preserveAspectRatio="none">
+      <polyline id="area" fill="rgba(255,147,41,0.12)" stroke="none" points=""></polyline>
+      <polyline id="line" fill="none" stroke="#ff9329" stroke-width="2"
+                stroke-linejoin="round" stroke-linecap="round" points=""></polyline>
+    </svg>
+    <div class="count" id="count">0 readings</div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = "https://wrnwmxpyxhyksyzggtpn.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_lUc9MEmmeo6dvzX7BmJiKQ_h8yReFRr";
+
+const MAX_POINTS = 100;
+const PRESSED_AT = 0.5;
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const elValue = document.getElementById("value");
+const elBadge = document.getElementById("badge");
+const elTime = document.getElementById("time");
+const elCount = document.getElementById("count");
+const elLine = document.getElementById("line");
+const elArea = document.getElementById("area");
+const elDot = document.getElementById("dot");
+const elStatus = document.getElementById("statusText");
+
+let points = [];
+let lastStamp = null;
+
+// Rows written before the button rig held raw 0-1023 readings.
+function normalise(v) {
+  return v > 1.5 ? v / 1023 : v;
+}
+
+function draw() {
+  if (points.length < 2) return;
+  const W = 700, H = 220, PAD = 12;
+  const coords = points.map((v, i) => {
+    const x = (i / (points.length - 1)) * W;
+    const y = H - PAD - v * (H - PAD * 2);
+    return x.toFixed(1) + "," + y.toFixed(1);
+  });
+  elLine.setAttribute("points", coords.join(" "));
+  elArea.setAttribute("points", "0," + H + " " + coords.join(" ") + " " + W + "," + H);
+}
+
+function push(v, stamp) {
+  const lv = Math.max(0, Math.min(1, normalise(v)));
+  points.push(lv);
+  if (points.length > MAX_POINTS) points.shift();
+
+  elValue.textContent = Math.round(lv * 100);
+  const pressed = lv > PRESSED_AT;
+  elBadge.textContent = pressed ? "pressed" : "released";
+  elBadge.classList.toggle("on", pressed);
+
+  lastStamp = new Date(stamp);
+  elCount.textContent = points.length + " readings";
+  draw();
+}
+
+function ago(d) {
+  const s = Math.round((Date.now() - d.getTime()) / 1000);
+  if (s < 60) return s + "s ago";
+  if (s < 3600) return Math.round(s / 60) + "m ago";
+  if (s < 86400) return Math.round(s / 3600) + "h ago";
+  return Math.round(s / 86400) + "d ago";
+}
+
+setInterval(() => {
+  if (!lastStamp) return;
+  const stale = Date.now() - lastStamp.getTime() > 5000;
+  elTime.textContent = "last reading " + ago(lastStamp);
+  elDot.classList.toggle("live", !stale);
+  elStatus.textContent = stale ? "no board connected" : "receiving";
+}, 1000);
+
+async function loadHistory() {
+  const { data, error } = await db
+    .from("readings")
+    .select("value, created_at")
+    .order("created_at", { ascending: false })
+    .limit(MAX_POINTS);
+  if (error) {
+    elStatus.textContent = "error: " + error.message;
+    return;
+  }
+  const rows = (data || []).reverse().filter(r => r.value !== null);
+  rows.forEach(r => push(r.value, r.created_at));
+}
+
+db.channel("readings-stream")
+  .on("postgres_changes",
+      { event: "INSERT", schema: "public", table: "readings" },
+      payload => {
+        if (payload.new.value !== null) push(payload.new.value, payload.new.created_at);
+      })
+  .subscribe(status => {
+    if (status === "SUBSCRIBED") elStatus.textContent = "connected";
+  });
+
+loadHistory();
+</script>
+</body>
+</html>
