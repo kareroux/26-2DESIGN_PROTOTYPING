@@ -25,7 +25,7 @@ export default function SensorFish({ value, power }: Props) {
         aria-label={label}
         style={{ '--level': level } as FishStyle}
       >
-        <img src="/images/goldfish.webp" alt="" />
+        <img src={`${import.meta.env.BASE_URL}images/goldfish.webp`} alt="" />
       </div>
       <div className="sensor-value">
         <span className="t-value">{value === undefined ? '—' : value.toLocaleString('ko-KR')}</span>
