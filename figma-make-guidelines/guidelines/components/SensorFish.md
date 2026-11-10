@@ -5,7 +5,7 @@
 - 이미지 `public/images/goldfish.webp` (투명 배경). `<div class="fish"><img src="/images/goldfish.webp" alt=""></div>`
 - 위치: 화면 정가운데. 감싸는 `<section aria-label="금붕어 상태">`는 min-height 70vh, flex 세로 정렬로 가로 세로 가운데. 소제목 없음
 - level = clamp((value − SENSOR_MIN) / (SENSOR_MAX − SENSOR_MIN), 0, 1) → `.fish`의 `--level` 스타일 변수
-- 밝기 0.25 + 0.75 × level, 빛 drop-shadow level × 48px `--fish-glow` (styles.md의 `.fish` 그대로)
+- 밝기 0.6 + 0.4 × level, 빛 drop-shadow level × 48px `--fish-glow` (styles.md의 `.fish` 그대로)
 - 전원 OFF: `data-power="off"` → 밝기 0.12, 흑백, 빛 없음
 - 위아래 10px, 6초 주기로 천천히 떠 있음. reduced-motion이면 멈춤
 - 금붕어 아래 space-6 간격으로 현재값 `t-value` (천 단위 콤마, 값 없으면 "—")

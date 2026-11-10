@@ -46,7 +46,7 @@ button { border: 0; border-radius: 0; }
 /* 센서 금붕어 */
 .fish { --level: 0; width: min(72vw, 360px); aspect-ratio: 1; margin: 0 auto; animation: fish-float 6s ease-in-out infinite alternate; }
 .fish img { display: block; width: 100%; height: 100%; object-fit: contain;
-  filter: brightness(calc(0.25 + 0.75 * var(--level))) drop-shadow(0 0 calc(var(--level) * 48px) var(--fish-glow));
+  filter: brightness(calc(0.6 + 0.4 * var(--level))) drop-shadow(0 0 calc(var(--level) * 48px) var(--fish-glow));
   transition: filter .4s; }
 .fish[data-power="off"] img { filter: brightness(0.12) grayscale(1); }
 @keyframes fish-float { from { transform: translateY(0); } to { transform: translateY(-10px); } }
