@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fish Lamp v10 — 분해 · 조립 · 점등</title>
+<style>
+  :root { --fg:#e9e6dc; --dim:#8d8a7e; --accent:#ffb347; --bg:#000; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--fg); font-family: -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Segoe UI", sans-serif; }
+  #fl-scrolly { position: relative; height: 620vh; }
+  #fl-stage { position: sticky; top: 0; height: 100svh; overflow: hidden; background: #000; }
+  #fl-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: pan-y; }
+  .fl-hud { position: absolute; left: 0; right: 0; pointer-events: none; padding: 0 clamp(16px, 4vw, 48px); }
+  .fl-top { top: clamp(16px, 4vh, 40px); display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+  .fl-title { font-size: 13px; letter-spacing: .18em; text-transform: uppercase; color: var(--dim); }
+  .fl-title b { color: var(--fg); font-weight: 600; }
+  .fl-dims { font: 12px/1.4 ui-monospace, "SF Mono", Menlo, monospace; color: var(--dim); text-align: right; }
+  .fl-bottom { bottom: clamp(20px, 5vh, 48px); display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; }
+  .fl-step { max-width: 34ch; }
+  .fl-step-no { font: 12px ui-monospace, "SF Mono", Menlo, monospace; color: var(--accent); letter-spacing: .12em; }
+  .fl-step-name { font-size: clamp(20px, 3.2vw, 30px); font-weight: 600; margin-top: 6px; line-height: 1.2; }
+  .fl-step-desc { font-size: 13px; line-height: 1.55; color: var(--dim); margin-top: 8px; min-height: 2.9em; }
+  .fl-bar { width: min(220px, 36vw); }
+  .fl-bar-track { height: 2px; background: #25241f; position: relative; }
+  .fl-bar-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0%; background: var(--accent); }
+  .fl-bar-label { margin-top: 8px; font: 11px ui-monospace, "SF Mono", Menlo, monospace; color: var(--dim); display: flex; justify-content: space-between; }
+  .fl-hint { position: absolute; left: 50%; bottom: 3vh; transform: translateX(-50%); font-size: 12px; letter-spacing: .2em; color: var(--dim); transition: opacity .4s; text-transform: uppercase; }
+  .fl-loading { position: absolute; inset: 0; display: grid; place-items: center; font-size: 13px; letter-spacing: .2em; color: var(--dim); background: #000; transition: opacity .5s; }
+  .fl-loading.done { opacity: 0; pointer-events: none; }
+  @media (max-width: 640px) { .fl-bottom { flex-direction: column; align-items: flex-start; } .fl-dims { display: none; } }
+</style>
+</head>
+<body>
+
+<section id="fl-scrolly">
+  <div id="fl-stage">
+    <canvas id="fl-canvas"></canvas>
+    <div class="fl-hud fl-top">
+      <div class="fl-title"><b>Fish Lamp</b> v10</div>
+      <div class="fl-dims" id="fl-dims">188.5 W × 90.8 D × 242.0 H mm</div>
+    </div>
+    <div class="fl-hint" id="fl-hint">scroll ↓</div>
+    <div class="fl-hud fl-bottom">
+      <div class="fl-step">
+        <div class="fl-step-no" id="fl-step-no">00 / 08</div>
+        <div class="fl-step-name" id="fl-step-name">분리</div>
+        <div class="fl-step-desc" id="fl-step-desc"></div>
+      </div>
+      <div class="fl-bar">
+        <div class="fl-bar-track"><div class="fl-bar-fill" id="fl-bar-fill"></div></div>
+        <div class="fl-bar-label"><span id="fl-parts">0 / 20 parts</span><span id="fl-pct">0%</span></div>
+      </div>
+    </div>
+    <div class="fl-loading" id="fl-loading">LOADING STL…</div>
+  </div>
+</section>
+
+<script src="vendor/three.min.js"></script>
+<script src="parts_data.js"></script>
+<script>
+(() => {
+'use strict';
+const THREE = window.THREE;
+
+/* =====================================================================
+   1) STL 로드 — 파일 바이트 그대로 파싱 (binary STL, 단위 mm)
+   ===================================================================== */
+function parseSTL(b64) {
+  const bin = atob(b64), u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  const dv = new DataView(u8.buffer);
+  const n = dv.getUint32(80, true);
+  if (84 + n * 50 !== u8.length) throw new Error('binary STL 크기 불일치');
+  const pos = new Float32Array(n * 9);
+  for (let i = 0; i < n; i++) {
+    const o = 84 + i * 50 + 12;
+    for (let k = 0; k < 9; k++) pos[i * 9 + k] = dv.getFloat32(o + k * 4, true);
+  }
+  return pos;
+}
+
+// 각진 모서리는 살리고 곡면(물고기 형상)만 부드럽게: 접힘각(crease) 이내의 면 법선만 평균
+function creasedNormals(pos, creaseDeg) {
+  const tri = pos.length / 9, cosT = Math.cos(creaseDeg * Math.PI / 180);
+  const fn = new Float32Array(tri * 3);       // 면적 가중 법선
+  const fu = new Float32Array(tri * 3);       // 단위 법선
+  for (let t = 0; t < tri; t++) {
+    const o = t * 9;
+    const ax = pos[o+3]-pos[o], ay = pos[o+4]-pos[o+1], az = pos[o+5]-pos[o+2];
+    const bx = pos[o+6]-pos[o], by = pos[o+7]-pos[o+1], bz = pos[o+8]-pos[o+2];
+    const nx = ay*bz-az*by, ny = az*bx-ax*bz, nz = ax*by-ay*bx;
+    const l = Math.hypot(nx, ny, nz) || 1;
+    fn[t*3] = nx; fn[t*3+1] = ny; fn[t*3+2] = nz;
+    fu[t*3] = nx/l; fu[t*3+1] = ny/l; fu[t*3+2] = nz/l;
+  }
+  const key = (x, y, z) => Math.round(x*100) + ',' + Math.round(y*100) + ',' + Math.round(z*100);
+  const map = new Map();
+  for (let t = 0; t < tri; t++) for (let v = 0; v < 3; v++) {
+    const k = key(pos[t*9+v*3], pos[t*9+v*3+1], pos[t*9+v*3+2]);
+    (map.get(k) || map.set(k, []).get(k)).push(t);
+  }
+  const out = new Float32Array(pos.length);
+  for (let t = 0; t < tri; t++) for (let v = 0; v < 3; v++) {
+    const k = key(pos[t*9+v*3], pos[t*9+v*3+1], pos[t*9+v*3+2]);
+    let sx = 0, sy = 0, sz = 0;
+    for (const u of map.get(k)) {
+      if (fu[u*3]*fu[t*3] + fu[u*3+1]*fu[t*3+1] + fu[u*3+2]*fu[t*3+2] >= cosT) {
+        sx += fn[u*3]; sy += fn[u*3+1]; sz += fn[u*3+2];
+      }
+    }
+    const l = Math.hypot(sx, sy, sz) || 1;
+    const o = t*9 + v*3;
+    out[o] = sx/l; out[o+1] = sy/l; out[o+2] = sz/l;
+  }
+  return out;
+}
+
+/* =====================================================================
+   2) 조립 좌표 (mm, Z-up). 원점 = 바닥판/상판 중심, 앞 = -Y, 오른쪽 = +X
+   ---------------------------------------------------------------------
+   * 파트 STL 은 각자 출력 방향 좌표라 조립 위치가 파일에 없다.
+     verification_report_v10.txt 의 치수와 v9 조립 STL 의 프로파일 보어 위치로 추정:
+       - 프로파일 중심 x=±84.3 (바깥면 = 바닥판 반폭 94.3), y=-35.4(앞)/+18.0(뒤)  [간격 53.4 = UNO 폭]
+       - 높이: 발 캡 8 + 프로파일 226 + 상단 캡 8 = 242.0 (보고서 전체 높이와 일치)
+       - 앞 패널 72 → base 80 (발 8 + 72), 옆·뒤 패널 218.5 → 상판 밑면(234)에 맞춤
+   ===================================================================== */
+const PX = 84.3, YF = -35.4, YB = 18.0, YM = (YF + YB) / 2;   // YM = -8.7
+const Z_FOOT = 8, Z_TOP = 234, PROFILE_LEN = 226;
+const D45 = Math.PI / 4, H = Math.PI / 2;
+
+const corners = { FL: [-PX, YF], FR: [PX, YF], BL: [-PX, YB], BR: [PX, YB] };
+// 캡(23×23)은 프로파일(20×20) 바깥 모서리에 맞춰 붙임 → 안쪽으로 3 mm 더 나옴. 전체 폭·깊이가 보고서(188.5 × 90.8)와 맞는 배치
+const capXY = (c) => [corners[c][0] - Math.sign(corners[c][0]) * 1.5, corners[c][1] + (c[0] === 'F' ? 1.5 : -1.5)];
+const PARTS = [];
+const add = (p) => PARTS.push(p);
+
+// 프로파일 ×4 : STL 은 20×20 단면을 45° 눕혀 놓은 1개 — 단면 중심(보어)이 원점이 되게 옮기고 45° 돌려 세움
+const profileRz = { FL: 0, FR: H, BR: 2 * H, BL: 3 * H };  // 깎인 모서리가 램프 안쪽을 향하게 (추정)
+for (const c of Object.keys(corners)) add({
+  id: 'profile_' + c, key: 'profile_x4', name: '프로파일 ' + c, mat: 'alu', stage: 0,
+  pre: [0, -14.14, -12.09], rx: D45, ry: -H, rz: profileRz[c],
+  pos: [corners[c][0], corners[c][1], Z_FOOT],
+  exp: [Math.sign(corners[c][0]) * 70, c[0] === 'F' ? -60 : 60, 0], win: [0.05, 0.19],
+});
+// 발 캡 ×4 : 머리 포켓이 바깥(아래)을 보도록 뒤집어 프로파일 아랫끝에 (z 0~8)
+for (const c of Object.keys(corners)) add({
+  id: 'foot_' + c, key: 'foot_cap_' + c + '_x1', name: '발 캡 ' + c, mat: 'dark', stage: 1,
+  rx: Math.PI, pos: [...capXY(c), Z_FOOT], exp: [0, 0, -70], win: [0.19, 0.27],
+});
+// 바닥판 : 프로파일 아랫끝으로 밀어 올려 발 캡 위에 얹힘
+add({ id: 'plate', key: 'bottom_plate_x1', name: '바닥판', mat: 'dark', stage: 1,
+  pos: [0, 0, Z_FOOT], exp: [0, 0, -110], win: [0.24, 0.33] });
+// 앞 패널 (72) : 슬롯을 따라 내려옴
+add({ id: 'front', key: 'front_panel_x1', name: '앞 패널', mat: 'cream', stage: 2,
+  pos: [0, YF, Z_FOOT], exp: [0, 0, 250], win: [0.33, 0.43] });
+// 옆 패널 L/R : 눕혀 출력된 상태(길이 218.4 = Y) → 세움
+for (const s of [['L', -1], ['R', 1]]) add({
+  id: 'side_' + s[0], key: 'side_panel_' + s[0] + '_x1', name: '옆 패널 ' + s[0], mat: 'cream', stage: 2,
+  pre: [0, 0, -21.2], rx: H, pos: [s[1] * PX, YM, Z_TOP - 109.2], exp: [s[1] * 0, 0, 300], win: [0.38, 0.48],
+});
+// 뒤 패널
+add({ id: 'back', key: 'back_panel_x1', name: '뒤 패널', mat: 'cream', stage: 2,
+  pos: [0, YB, Z_TOP - 218.5], exp: [0, 0, 330], win: [0.42, 0.52] });
+// 데크 (센서 4개를 밑에 붙여 내림, base 80 위)
+add({ id: 'deck', key: 'deck_x1', name: '데크', mat: 'slate', stage: 3,
+  pos: [0, -45.4 + 37.85, 80], exp: [0, 0, 280], win: [0.52, 0.59] });  // 앞면을 프로파일 바깥면(-45.4)에 맞춤 → 전체 깊이 90.8 유지
+// 투명(라이트) 패널 160.1
+add({ id: 'light', key: 'light_panel_x1', name: '라이트 패널', mat: 'light', stage: 4,
+  pos: [0, YM, Z_TOP - 160.1], exp: [0, 0, 340], win: [0.59, 0.69] });
+// 상판 : 프로파일 윗끝에 덮음 (STL 앞뒤가 반대라 Z 로 180° 회전)
+add({ id: 'top', key: 'top_panel_x1', name: '상판', mat: 'dark', stage: 5,
+  rz: Math.PI, pos: [0, 0, Z_TOP], exp: [0, 0, 260], win: [0.69, 0.77] });
+// 상단 캡 ×4
+for (const c of Object.keys(corners)) add({
+  id: 'topcap_' + c, key: 'top_cap_' + c + '_x1', name: '상단 캡 ' + c, mat: 'dark', stage: 6,
+  pos: [...capXY(c), Z_TOP], exp: [0, 0, 150], win: [0.77, 0.83],
+});
+
+const STEPS = [
+  ['분리', '파트별 STL 20개가 흩어져 있다. 모든 형상은 파일 그대로.'],
+  ['프로파일 ×4', '2020 프로파일 226 mm 네 개가 세워진다.'],
+  ['발 캡 · 바닥판', '발 캡 4개가 올라붙고, 바닥판이 프로파일 끝으로 밀려 올라간다.'],
+  ['앞 · 옆 · 뒤 패널', '패널이 슬롯을 따라 미끄러져 내려간다.'],
+  ['데크', '센서를 붙인 데크가 내려앉는다.'],
+  ['라이트 패널', '라이트 패널이 앞 슬롯으로 내려간다.'],
+  ['상판 · 상단 캡', '상판을 덮고 M5×20 캡 4개로 고정한다.'],
+  ['점등', '램프가 켜진다.'],
+];
+
+/* =====================================================================
+   3) Three.js 장면
+   ===================================================================== */
+const canvas = document.getElementById('fl-canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.setClearColor(0x000000, 1);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000000);
+const camera = new THREE.PerspectiveCamera(32, 1, 5, 6000);
+
+// 소프트박스 환경맵 (검은 배경에서 RoomEnvironment 는 하얗게 뜸)
+(function makeEnv() {
+  const envScene = new THREE.Scene();
+  envScene.background = new THREE.Color(0x000000);
+  const box = (w, h, pos, k) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+    m.material.color.setRGB(1, 0.97, 0.92).multiplyScalar(k);
+    m.position.set(...pos); m.lookAt(0, 0, 0); envScene.add(m);
+  };
+  box(14, 9, [5, 8, 7], 6);      // 키 라이트 (우상단 앞)
+  box(9, 12, [-9, 3, 4], 2.2);   // 좌측 필
+  box(16, 3, [0, 4, -9], 3.5);   // 뒤 림
+  box(18, 6, [0, 9, 0], 1.4);    // 천장
+  const pm = new THREE.PMREMGenerator(renderer);
+  scene.environment = pm.fromScene(envScene, 0.04).texture;
+  pm.dispose();
+})();
+
+const key = new THREE.DirectionalLight(0xfff3e0, 0.9);
+key.position.set(200, 400, 300); scene.add(key);
+
+// 조립 좌표(Z-up) → Three(Y-up): y=z, z=-y  (앞 = -Y → 카메라 쪽 +Z)
+const root = new THREE.Group();
+root.rotation.x = -Math.PI / 2;
+scene.add(root);
+
+const MATS = {
+  alu:   new THREE.MeshStandardMaterial({ color: 0xd8dce2, metalness: 1.0, roughness: 0.3, envMapIntensity: 1.7 }),
+  dark:  new THREE.MeshStandardMaterial({ color: 0x17191d, metalness: 0.0, roughness: 0.5, envMapIntensity: 0.6 }),
+  cream: new THREE.MeshStandardMaterial({ color: 0xe6e0d2, metalness: 0.0, roughness: 0.6, envMapIntensity: 0.9 }),
+  slate: new THREE.MeshStandardMaterial({ color: 0x3b4a58, metalness: 0.0, roughness: 0.55, envMapIntensity: 0.9 }),
+  light: new THREE.MeshStandardMaterial({ color: 0xcfc8b8, metalness: 0.0, roughness: 0.35, envMapIntensity: 0.9,
+                                           emissive: new THREE.Color(0xff7a1c), emissiveIntensity: 0 }),
+};
+
+const geoCache = new Map();
+function geometryFor(key) {
+  if (!geoCache.has(key)) {
+    const pos = parseSTL(window.LAMP_STL[key]);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(creasedNormals(pos, 38), 3));
+    geoCache.set(key, g);
+  }
+  return geoCache.get(key);
+}
+
+const T = (x, y, z) => new THREE.Matrix4().makeTranslation(x, y, z);
+const meshes = [];
+let triTotal = 0;
+for (const p of PARTS) {
+  const g = geometryFor(p.key).clone();
+  const m = T(...p.pos);
+  m.multiply(new THREE.Matrix4().makeRotationZ(p.rz || 0));
+  m.multiply(new THREE.Matrix4().makeRotationY(p.ry || 0));
+  m.multiply(new THREE.Matrix4().makeRotationX(p.rx || 0));
+  if (p.pre) m.multiply(T(...p.pre));
+  g.applyMatrix4(m);                       // 최종 조립 자세로 구워 둠 (법선도 같이 회전)
+  g.computeBoundingBox();
+  const mesh = new THREE.Mesh(g, MATS[p.mat]);
+  mesh.userData = { p, box: g.boundingBox.clone() };
+  root.add(mesh); meshes.push(mesh);
+  triTotal += g.attributes.position.count / 3;
+}
+
+// 점등: 라이트 패널 근처의 따뜻한 포인트 라이트 + 가산 헤일로
+const lightMesh = meshes.find(m => m.userData.p.id === 'light');
+const lb = lightMesh.userData.box;
+const lampLight = new THREE.PointLight(0xffa850, 0, 420, 2);
+lampLight.position.set((lb.min.x + lb.max.x) / 2, (lb.min.z + lb.max.z) / 2 + 10, -((lb.min.y + lb.max.y) / 2) + 30);
+scene.add(lampLight);
+const halo = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const x = c.getContext('2d'), gr = x.createRadialGradient(64, 64, 0, 64, 64, 64);
+  gr.addColorStop(0, 'rgba(255,190,110,.9)'); gr.addColorStop(.35, 'rgba(255,150,60,.28)'); gr.addColorStop(1, 'rgba(255,120,30,0)');
+  x.fillStyle = gr; x.fillRect(0, 0, 128, 128);
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 }));
+  s.position.copy(lampLight.position); s.scale.setScalar(360);
+  scene.add(s); return s;
+})();
+
+/* =====================================================================
+   4) 스크롤 타임라인
+   ===================================================================== */
+const sec = document.getElementById('fl-scrolly');
+const el = {
+  no: document.getElementById('fl-step-no'), name: document.getElementById('fl-step-name'),
+  desc: document.getElementById('fl-step-desc'), fill: document.getElementById('fl-bar-fill'),
+  parts: document.getElementById('fl-parts'), pct: document.getElementById('fl-pct'),
+  hint: document.getElementById('fl-hint'), loading: document.getElementById('fl-loading'),
+};
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const smooth = (t) => t * t * (3 - 2 * t);
+const seg = (p, a, b) => smooth(clamp((p - a) / (b - a)));
+const lerp = (a, b, t) => a + (b - a) * t;
+
+// 카메라 키프레임 [진행도, 방위각(°, 0=정면), 고도각(°)]
+const CAM = [[0, -52, 24], [0.30, -34, 20], [0.62, -12, 17], [0.82, 22, 14], [1, 26, 12]];
+function camAngles(p) {
+  for (let i = 0; i < CAM.length - 1; i++) {
+    const a = CAM[i], b = CAM[i + 1];
+    if (p <= b[0]) { const t = smooth(clamp((p - a[0]) / (b[0] - a[0]))); return [lerp(a[1], b[1], t), lerp(a[2], b[2], t)]; }
+  }
+  const l = CAM[CAM.length - 1]; return [l[1], l[2]];
+}
+
+let target = 0, cur = 0, camC = new THREE.Vector3(0, 120, 0), camD = 900, camInit = false;
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const tmpBox = new THREE.Box3(), tmpC = new THREE.Vector3(), tmpS = new THREE.Vector3();
+
+function readScroll() {
+  const r = sec.getBoundingClientRect();
+  target = clamp(-r.top / Math.max(1, r.height - innerHeight));
+}
+
+function apply(p, time) {
+  // 파트 위치: 최종 자세 + 분해 오프셋 × (1 - 진행)
+  let done = 0;
+  tmpBox.makeEmpty();
+  for (const m of meshes) {
+    const { p: d, box } = m.userData;
+    const t = seg(p, d.win[0], d.win[1]);
+    m.position.set(d.exp[0] * (1 - t), d.exp[1] * (1 - t) + 0, d.exp[2] * (1 - t));
+    if (t >= 0.999) done++;
+    tmpBox.expandByPoint(tmpS.set(box.min.x + m.position.x, box.min.y + m.position.y, box.min.z + m.position.z));
+    tmpBox.expandByPoint(tmpS.set(box.max.x + m.position.x, box.max.y + m.position.y, box.max.z + m.position.z));
+  }
+  // 점등
+  const on = seg(p, 0.86, 0.97);
+  const flick = reduce ? 1 : 1 + 0.025 * Math.sin(time * 2.1) + 0.015 * Math.sin(time * 5.3);
+  MATS.light.emissiveIntensity = on * 0.8 * flick;
+  lampLight.intensity = on * 1.1 * flick;
+  halo.material.opacity = on * 0.22 * flick;
+
+  // 카메라: 현재 파트 묶음의 경계구에 맞춰 거리 자동 (조립 좌표 → Three 좌표)
+  const cx = (tmpBox.min.x + tmpBox.max.x) / 2, cy = (tmpBox.min.y + tmpBox.max.y) / 2, cz = (tmpBox.min.z + tmpBox.max.z) / 2;
+  const R = 0.5 * Math.hypot(tmpBox.max.x - tmpBox.min.x, tmpBox.max.y - tmpBox.min.y, tmpBox.max.z - tmpBox.min.z);
+  const vh = THREE.MathUtils.degToRad(camera.fov / 2), hh = Math.atan(Math.tan(vh) * camera.aspect);
+  const wantD = R / Math.sin(Math.min(vh, hh)) * 1.03;
+  const wantC = tmpC.set(cx, cz, -cy);
+  if (!camInit) { camC.copy(wantC); camD = wantD; camInit = true; }
+  camC.lerp(wantC, 0.12); camD = lerp(camD, wantD, 0.12);
+  let [az, el_] = camAngles(p);
+  if (!reduce) az += Math.sin(time * 0.35) * 1.2;
+  const a = THREE.MathUtils.degToRad(az), e = THREE.MathUtils.degToRad(el_);
+  camera.position.set(camC.x + camD * Math.sin(a) * Math.cos(e), camC.y + camD * Math.sin(e), camC.z + camD * Math.cos(a) * Math.cos(e));
+  camera.lookAt(camC);
+
+  // HUD
+  const stepIdx = p < 0.05 ? 0 : p < 0.19 ? 1 : p < 0.33 ? 2 : p < 0.52 ? 3 : p < 0.59 ? 4 : p < 0.69 ? 5 : p < 0.83 ? 6 : 7;
+  el.no.textContent = String(stepIdx).padStart(2, '0') + ' / 07';
+  el.name.textContent = STEPS[stepIdx][0];
+  el.desc.textContent = STEPS[stepIdx][1];
+  el.fill.style.width = (p * 100).toFixed(1) + '%';
+  el.pct.textContent = Math.round(p * 100) + '%';
+  el.parts.textContent = done + ' / ' + meshes.length + ' parts';
+  el.hint.style.opacity = p < 0.02 ? 1 : 0;
+}
+
+/* =====================================================================
+   5) 루프 · 리사이즈 · 입력
+   ===================================================================== */
+function resize() {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize); resize();
+addEventListener('scroll', readScroll, { passive: true }); readScroll();
+
+// 마우스 세로 드래그 → 스크롤
+let drag = null;
+canvas.addEventListener('pointerdown', (e) => { if (e.pointerType === 'mouse') { drag = e.clientY; canvas.setPointerCapture(e.pointerId); } });
+canvas.addEventListener('pointermove', (e) => { if (drag !== null) { scrollBy(0, (drag - e.clientY) * 2.2); drag = e.clientY; } });
+canvas.addEventListener('pointerup', () => { drag = null; });
+
+let visible = true;
+new IntersectionObserver((es) => { visible = es[0].isIntersecting; }).observe(document.getElementById('fl-stage'));
+
+let last = performance.now();
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (!visible) { last = now; return; }
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  cur += (target - cur) * Math.min(1, dt * 7);
+  if (Math.abs(target - cur) < 1e-4) cur = target;
+  apply(cur, now / 1000);
+  renderer.render(scene, camera);
+}
+
+// 테스트 훅: ?p=0.6 으로 진행도 고정 / window.__fl 로 조회
+const q = new URLSearchParams(location.search);
+window.__fl = {
+  setProgress(v) { target = cur = clamp(v); apply(cur, 0); renderer.render(scene, camera); },
+  info() { return { parts: meshes.length, triangles: triTotal }; },
+  assembledBox() {
+    const b = new THREE.Box3();
+    for (const m of meshes) { b.expandByPoint(m.userData.box.min); b.expandByPoint(m.userData.box.max); }
+    const s = b.getSize(new THREE.Vector3()); return { w: s.x, d: s.y, h: s.z, min: b.min.toArray(), max: b.max.toArray() };
+  },
+};
+if (q.has('p')) { sec.style.height = '100svh'; target = cur = clamp(parseFloat(q.get('p'))); }
+
+el.loading.classList.add('done');
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
