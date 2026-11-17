@@ -4,31 +4,127 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Fish Lamp v10 — 분해 · 조립 · 점등</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  :root { --fg:#e9e6dc; --dim:#8d8a7e; --accent:#ffb347; --bg:#000; }
+  /* ---------------------------------------------------------------
+     어항 Design System v1.0 — design-system/tokens.json
+     이 블록의 모든 값은 토큰에서 온다. 하드코딩 금지.
+     --------------------------------------------------------------- */
+  :root {
+    /* color — semantic 층만 참조한다 */
+    --bg-canvas:      #000000;
+    --fg-primary:     #F5F2EC;
+    --fg-secondary:   #C7C9CE;
+    --fg-muted:       #7D808A;
+    --fg-signal:      #FFA850;
+    --bg-signal:      #FFA850;
+    --border-hairline: rgba(245,242,236,0.12);
+
+    /* typography */
+    --font-display: 'Archivo', 'IBM Plex Sans KR', sans-serif;
+    --font-text:    'IBM Plex Sans KR', -apple-system, 'Apple SD Gothic Neo', sans-serif;
+    --font-mono:    'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+    --size-3xs: 11px; --size-2xs: 12px; --size-xs: 14px; --size-sm: 16px;
+    --weight-regular: 400; --weight-medium: 500; --weight-bold: 700;
+    --leading-snug: 1.25; --leading-normal: 1.55;
+    --tracking-heading: -0.015em; --tracking-label: 0.12em;
+
+    /* space */
+    --space-1: 4px;  --space-2: 8px;  --space-3: 12px;
+    --space-4: 16px; --space-5: 24px; --space-6: 32px; --space-7: 48px;
+
+    /* radius / border */
+    --radius-none: 0px; --border-thick: 2px;
+
+    /* motion */
+    --duration-base: 240ms; --duration-slow: 480ms;
+    --easing-standard: cubic-bezier(0.2, 0, 0, 1);
+
+    /* breakpoint sm = 480px, md = 768px (아래 media query 참조) */
+  }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { background: var(--bg); color: var(--fg); font-family: -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Segoe UI", sans-serif; }
+  html, body {
+    background: var(--bg-canvas);
+    color: var(--fg-primary);
+    font-family: var(--font-text);
+  }
+
   #fl-scrolly { position: relative; height: 620vh; }
-  #fl-stage { position: sticky; top: 0; height: 100svh; overflow: hidden; background: #000; }
+  #fl-stage { position: sticky; top: 0; height: 100svh; overflow: hidden; background: var(--bg-canvas); }
   #fl-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: pan-y; }
-  .fl-hud { position: absolute; left: 0; right: 0; pointer-events: none; padding: 0 clamp(16px, 4vw, 48px); }
-  .fl-top { top: clamp(16px, 4vh, 40px); display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
-  .fl-title { font-size: 13px; letter-spacing: .18em; text-transform: uppercase; color: var(--dim); }
-  .fl-title b { color: var(--fg); font-weight: 600; }
-  .fl-dims { font: 12px/1.4 ui-monospace, "SF Mono", Menlo, monospace; color: var(--dim); text-align: right; }
-  .fl-bottom { bottom: clamp(20px, 5vh, 48px); display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; }
+
+  .fl-hud { position: absolute; left: 0; right: 0; pointer-events: none;
+            padding: 0 clamp(var(--space-4), 4vw, var(--space-7)); }
+  .fl-top { top: clamp(var(--space-4), 4vh, 40px); display: flex;
+            justify-content: space-between; align-items: baseline; gap: var(--space-4); }
+
+  /* label/md — mono 대문자 */
+  .fl-title { font-family: var(--font-mono); font-size: var(--size-2xs);
+              font-weight: var(--weight-medium); letter-spacing: var(--tracking-label);
+              text-transform: uppercase; color: var(--fg-muted); }
+  .fl-title b { color: var(--fg-primary); font-weight: var(--weight-medium); }
+
+  /* data/md — 실측 치수 */
+  .fl-dims { font-family: var(--font-mono); font-size: var(--size-2xs);
+             font-weight: var(--weight-regular); line-height: var(--leading-snug);
+             color: var(--fg-muted); text-align: right; }
+
+  .fl-bottom { bottom: clamp(20px, 5vh, var(--space-7)); display: flex;
+               justify-content: space-between; align-items: flex-end; gap: var(--space-5); }
   .fl-step { max-width: 34ch; }
-  .fl-step-no { font: 12px ui-monospace, "SF Mono", Menlo, monospace; color: var(--accent); letter-spacing: .12em; }
-  .fl-step-name { font-size: clamp(20px, 3.2vw, 30px); font-weight: 600; margin-top: 6px; line-height: 1.2; }
-  .fl-step-desc { font-size: 13px; line-height: 1.55; color: var(--dim); margin-top: 8px; min-height: 2.9em; }
+
+  /* label/md — 신호색은 상태 표시에만 */
+  .fl-step-no { font-family: var(--font-mono); font-size: var(--size-2xs);
+                font-weight: var(--weight-medium); letter-spacing: var(--tracking-label);
+                color: var(--fg-signal); }
+
+  /* heading — 한글이므로 display 서체를 쓰지 않는다 (§2.2) */
+  .fl-step-name { font-family: var(--font-text); font-size: clamp(20px, 3.2vw, 30px);
+                  font-weight: var(--weight-medium); letter-spacing: var(--tracking-heading);
+                  line-height: var(--leading-snug); margin-top: var(--space-2); }
+
+  /* body/sm */
+  .fl-step-desc { font-size: var(--size-xs); line-height: var(--leading-normal);
+                  color: var(--fg-muted); margin-top: var(--space-2); min-height: 2.9em; }
+
   .fl-bar { width: min(220px, 36vw); }
-  .fl-bar-track { height: 2px; background: #25241f; position: relative; }
-  .fl-bar-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0%; background: var(--accent); }
-  .fl-bar-label { margin-top: 8px; font: 11px ui-monospace, "SF Mono", Menlo, monospace; color: var(--dim); display: flex; justify-content: space-between; }
-  .fl-hint { position: absolute; left: 50%; bottom: 3vh; transform: translateX(-50%); font-size: 12px; letter-spacing: .2em; color: var(--dim); transition: opacity .4s; text-transform: uppercase; }
-  .fl-loading { position: absolute; inset: 0; display: grid; place-items: center; font-size: 13px; letter-spacing: .2em; color: var(--dim); background: #000; transition: opacity .5s; }
+  .fl-bar-track { height: var(--border-thick); background: var(--border-hairline);
+                  border-radius: var(--radius-none); position: relative; }
+  .fl-bar-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0%;
+                 background: var(--bg-signal); }
+
+  /* label/sm */
+  .fl-bar-label { margin-top: var(--space-2); font-family: var(--font-mono);
+                  font-size: var(--size-3xs); font-weight: var(--weight-medium);
+                  letter-spacing: var(--tracking-label); color: var(--fg-muted);
+                  display: flex; justify-content: space-between; }
+
+  .fl-hint { position: absolute; left: 50%; bottom: 3vh; transform: translateX(-50%);
+             font-family: var(--font-mono); font-size: var(--size-3xs);
+             font-weight: var(--weight-medium); letter-spacing: var(--tracking-label);
+             text-transform: uppercase; color: var(--fg-muted);
+             transition: opacity var(--duration-base) var(--easing-standard); }
+
+  .fl-loading { position: absolute; inset: 0; display: grid; place-items: center;
+                font-family: var(--font-mono); font-size: var(--size-2xs);
+                font-weight: var(--weight-medium); letter-spacing: var(--tracking-label);
+                color: var(--fg-muted); background: var(--bg-canvas);
+                transition: opacity var(--duration-slow) var(--easing-standard); }
   .fl-loading.done { opacity: 0; pointer-events: none; }
-  @media (max-width: 640px) { .fl-bottom { flex-direction: column; align-items: flex-start; } .fl-dims { display: none; } }
+
+  /* breakpoint sm */
+  @media (max-width: 640px) {
+    .fl-bottom { flex-direction: column; align-items: flex-start; }
+    .fl-dims { display: none; }
+  }
+
+  /* §2.5 — reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    .fl-hint, .fl-loading { transition: none; }
+  }
 </style>
 </head>
 <body>
