@@ -154,11 +154,8 @@
   .ds-section { padding:var(--space-10) 0; border-top:1px solid var(--border-hairline); }
   .ds-section:first-of-type { border-top:0; }
 
-  .ds-label{ font-family:var(--font-mono); font-size:var(--size-3xs); font-weight:var(--weight-medium);
-             letter-spacing:var(--tracking-label); text-transform:uppercase; color:var(--fg-muted); }
   .ds-h2{ font-size:var(--size-2xl); font-weight:var(--weight-medium);
           letter-spacing:var(--tracking-heading); line-height:var(--leading-snug); margin-top:var(--space-5); }
-  .ds-h2.lat{ font-family:var(--font-display); font-weight:var(--weight-bold); }
   .ds-h3{ font-size:var(--size-lg); font-weight:var(--weight-medium);
           letter-spacing:var(--tracking-heading); line-height:var(--leading-snug); }
   .ds-lead{ font-size:var(--size-md); line-height:var(--leading-normal); color:var(--fg-secondary);
@@ -648,7 +645,6 @@ requestAnimationFrame(frame);
 
   <section class="ds-section ds-grid">
     <div class="col-8">
-      <div class="ds-label">01 — Product</div>
       <h2 class="ds-h2">어항</h2>
       <p class="ds-lead">손의 움직임에 따라 반응하는 인터랙티브 오브제 조명.
         알루미늄 프로파일 구조를 PLA로 직접 출력해 세우고, 데크 아래 적외선 센서가 읽은
@@ -663,7 +659,6 @@ requestAnimationFrame(frame);
 
   <section class="ds-section ds-grid">
     <div class="col-8">
-      <div class="ds-label">02 — Concept</div>
       <h2 class="ds-h2">시각 외 감각</h2>
       <p class="ds-body">조명은 보통 스위치로 켠다. 손가락이 플라스틱을 누르고, 딸깍 소리가 나고,
         빛이 한 번에 들어온다. 그 과정에 빛과 손의 관계는 없다.</p>
@@ -679,7 +674,6 @@ requestAnimationFrame(frame);
 
   <section class="ds-section ds-grid">
     <div class="col-8">
-      <div class="ds-label">03 — Construction</div>
       <h2 class="ds-h2">20개의 부품</h2>
       <p class="ds-lead">나사는 상·하단 캡 8개에만 쓴다. 나머지 패널은 전부 기둥의 슬롯을
         타고 내려가 자리를 잡는다.</p>
@@ -687,32 +681,28 @@ requestAnimationFrame(frame);
     <div class="ds-cards">
       <article class="ds-card ds-card--featured">
         <img src="media/structure.jpg" alt="프로파일 골조 4개가 세워진 상태">
-        <div class="ds-label">Structure</div>
-        <h3 class="ds-h3">프로파일 골조</h3>
+          <h3 class="ds-h3">프로파일 골조</h3>
         <p class="ds-body">2020 규격을 출력에 맞게 고쳐 설계한 기둥 4개.
           한쪽 모서리를 3 mm 모따기해 45° 로 눕혀 출력하면 서포트가 필요 없다.</p>
         <div class="ds-card-meta">226 × 20 × 20 mm · ×4</div>
       </article>
       <article class="ds-card">
         <img src="media/enclosure.jpg" alt="앞·옆·뒤 패널이 슬롯을 타고 내려오는 상태">
-        <div class="ds-label">Enclosure</div>
-        <h3 class="ds-h3">패널</h3>
+          <h3 class="ds-h3">패널</h3>
         <p class="ds-body">앞·옆·뒤 패널의 혀가 슬롯에 5.4 mm 두께로 맞물린다.
           순서대로 내려야 서로를 막지 않는다.</p>
         <div class="ds-card-meta">7.2 mm 두께 · 5종</div>
       </article>
       <article class="ds-card">
         <img src="media/sensing.jpg" alt="센서 데크가 내려앉는 상태">
-        <div class="ds-label">Sensing</div>
-        <h3 class="ds-h3">센서 데크</h3>
+          <h3 class="ds-h3">센서 데크</h3>
         <p class="ds-body">데크 아래에 적외선 센서 4개를 붙인다.
           데크가 센서를 가리면서 동시에 물건을 올려놓는 면이 된다.</p>
         <div class="ds-card-meta">164.9 × 75.7 × 4.0 mm</div>
       </article>
       <article class="ds-card">
         <img src="media/optics.jpg" alt="발광부가 점등된 상태">
-        <div class="ds-label">Optics</div>
-        <h3 class="ds-h3">발광부</h3>
+          <h3 class="ds-h3">발광부</h3>
         <p class="ds-body">투명 PETG 패널 뒤에서 빛이 확산된다.
           점등색은 호박색 <span class="ds-tag">#FFA850</span></p>
         <div class="ds-card-meta">157.5 × 43.2 × 160.1 mm</div>
@@ -722,7 +712,6 @@ requestAnimationFrame(frame);
 
   <section class="ds-section ds-grid" id="process">
     <div class="col-8">
-      <div class="ds-label">04 — Process</div>
       <h2 class="ds-h2">조립 순서</h2>
       <p class="ds-lead">순서가 곧 설계다. 아래 순서를 벗어나면 뒤 부품이 앞 부품에 막힌다.</p>
     </div>
@@ -756,8 +745,7 @@ requestAnimationFrame(frame);
 
   <section class="ds-section ds-grid" id="spec">
     <div class="col-6">
-      <div class="ds-label">05 — Specification</div>
-      <h2 class="ds-h2 lat">Spec</h2>
+      <h2 class="ds-h2">제원</h2>
       <dl class="ds-dl">
         <dt>치수</dt><dd>188.5 W × 90.8 D × 242.0 H mm</dd>
         <dt>비율</dt><dd>받침 80 : 조명 159</dd>
@@ -770,7 +758,6 @@ requestAnimationFrame(frame);
       </dl>
     </div>
     <div class="col-6">
-      <div class="ds-label">06 — Contact</div>
       <h2 class="ds-h2">문의</h2>
       <form onsubmit="return false">
         <div class="ds-field">
