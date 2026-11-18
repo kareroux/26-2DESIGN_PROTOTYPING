@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Fish Lamp v10 — 분해 · 조립 · 점등</title>
+<title>Fish Lamp v10 — 분해, 조립, 점등</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500&display=swap" rel="stylesheet">
@@ -239,9 +239,6 @@
     box-shadow:0 0 0 var(--border-hairline-w) var(--fg-signal); }
   .ds-field .ds-help{ font-size:var(--size-xs); color:var(--fg-muted); margin-top:var(--space-2); }
 
-  .ds-quote{ grid-column:span 8; margin-top:var(--space-7); padding-left:var(--space-5);
-             border-left:2px solid var(--fg-signal); font-size:var(--size-md);
-             line-height:var(--leading-normal); color:var(--fg-primary); }
 
   .ds-foot{ border-top:1px solid var(--border-hairline); padding:var(--space-7) 0 var(--space-9);
             display:flex; justify-content:space-between; gap:var(--space-5); flex-wrap:wrap;
@@ -251,8 +248,7 @@
   @media (max-width:1024px){ /* lg */
     .ds-cards{ grid-template-columns:repeat(2,1fr); }
     .col-6{ grid-column:span 12; } .col-8{ grid-column:span 12; }
-    .ds-quote{ grid-column:span 12; }
-  }
+    }
   @media (max-width:768px){ /* md */
     .ds-btn{ height:var(--btn-height-touch); }   /* §4.1 터치 대상 최소 44px */
     .ds-cards{ grid-template-columns:1fr; }
@@ -411,11 +407,11 @@ for (const c of Object.keys(corners)) add({
 const STEPS = [
   ['분리', '파트별 STL 20개가 흩어져 있다. 모든 형상은 파일 그대로.'],
   ['프로파일 ×4', '2020 프로파일 226 mm 네 개가 세워진다.'],
-  ['발 캡 · 바닥판', '발 캡 4개가 올라붙고, 바닥판이 프로파일 끝으로 밀려 올라간다.'],
-  ['앞 · 옆 · 뒤 패널', '패널이 슬롯을 따라 미끄러져 내려간다.'],
+  ['발 캡과 바닥판', '발 캡 4개가 올라붙고, 바닥판이 프로파일 끝으로 밀려 올라간다.'],
+  ['앞, 옆, 뒤 패널', '패널이 슬롯을 따라 미끄러져 내려간다.'],
   ['데크', '센서를 붙인 데크가 내려앉는다.'],
   ['라이트 패널', '라이트 패널이 앞 슬롯으로 내려간다.'],
-  ['상판 · 상단 캡', '상판을 덮고 M5×20 캡 4개로 고정한다.'],
+  ['상판과 상단 캡', '상판을 덮고 M5×20 캡 4개로 고정한다.'],
   ['점등', '램프가 켜진다.'],
 ];
 
@@ -668,14 +664,12 @@ requestAnimationFrame(frame);
       <p class="ds-body">이름은 물을 담지 않는 어항에서 왔다. 유리 대신 투명 PETG 패널이,
         물 대신 호박색 빛이 안에서 흔들린다.</p>
     </div>
-    <blockquote class="ds-quote">빛을 조작하는 것이 아니라,
-      빛이 손을 따라오게 한다.</blockquote>
   </section>
 
   <section class="ds-section ds-grid">
     <div class="col-8">
       <h2 class="ds-h2">20개의 부품</h2>
-      <p class="ds-lead">나사는 상·하단 캡 8개에만 쓴다. 나머지 패널은 전부 기둥의 슬롯을
+      <p class="ds-lead">나사는 위아래 캡 8개에만 쓴다. 나머지 패널은 전부 기둥의 슬롯을
         타고 내려가 자리를 잡는다.</p>
     </div>
     <div class="ds-cards">
@@ -684,14 +678,14 @@ requestAnimationFrame(frame);
           <h3 class="ds-h3">프로파일 골조</h3>
         <p class="ds-body">2020 규격을 출력에 맞게 고쳐 설계한 기둥 4개.
           한쪽 모서리를 3 mm 모따기해 45° 로 눕혀 출력하면 서포트가 필요 없다.</p>
-        <div class="ds-card-meta">226 × 20 × 20 mm · ×4</div>
+        <div class="ds-card-meta">226 × 20 × 20 mm, 4개</div>
       </article>
       <article class="ds-card">
-        <img src="media/enclosure.jpg" alt="앞·옆·뒤 패널이 슬롯을 타고 내려오는 상태">
+        <img src="media/enclosure.jpg" alt="앞, 옆, 뒤 패널이 슬롯을 타고 내려오는 상태">
           <h3 class="ds-h3">패널</h3>
-        <p class="ds-body">앞·옆·뒤 패널의 혀가 슬롯에 5.4 mm 두께로 맞물린다.
+        <p class="ds-body">앞, 옆, 뒤 패널의 혀가 슬롯에 5.4 mm 두께로 맞물린다.
           순서대로 내려야 서로를 막지 않는다.</p>
-        <div class="ds-card-meta">7.2 mm 두께 · 5종</div>
+        <div class="ds-card-meta">7.2 mm 두께, 5종</div>
       </article>
       <article class="ds-card">
         <img src="media/sensing.jpg" alt="센서 데크가 내려앉는 상태">
@@ -713,7 +707,6 @@ requestAnimationFrame(frame);
   <section class="ds-section ds-grid" id="process">
     <div class="col-8">
       <h2 class="ds-h2">조립 순서</h2>
-      <p class="ds-lead">순서가 곧 설계다. 아래 순서를 벗어나면 뒤 부품이 앞 부품에 막힌다.</p>
     </div>
     <div class="ds-steps">
       <div class="ds-step"><div class="ds-step-n">01</div><div>
@@ -726,7 +719,7 @@ requestAnimationFrame(frame);
         <div class="ds-step-t">앞 패널을 슬롯에 내린다</div>
         <div class="ds-step-d">혀가 4.5 mm 들어간다</div></div></div>
       <div class="ds-step"><div class="ds-step-n">04</div><div>
-        <div class="ds-step-t">옆 패널 좌·우를 내린다</div>
+        <div class="ds-step-t">옆 패널 좌우를 내린다</div>
         <div class="ds-step-d">앞 패널 다음이어야 한다</div></div></div>
       <div class="ds-step"><div class="ds-step-n">05</div><div>
         <div class="ds-step-t">뒤 패널을 내린다</div>
@@ -750,11 +743,11 @@ requestAnimationFrame(frame);
         <dt>치수</dt><dd>188.5 W × 90.8 D × 242.0 H mm</dd>
         <dt>비율</dt><dd>받침 80 : 조명 159</dd>
         <dt>부품</dt><dd>20 parts</dd>
-        <dt>소재</dt><dd>PLA · PETG</dd>
-        <dt>체결</dt><dd>M5 × 20 · 8 ea</dd>
+        <dt>소재</dt><dd>PLA, PETG</dd>
+        <dt>체결</dt><dd>M5 × 20, 8개</dd>
         <dt>센서</dt><dd>IR × 4</dd>
         <dt>출력</dt><dd>서포트 없음</dd>
-        <dt>모델</dt><dd>v10 · 2026.10</dd>
+        <dt>모델</dt><dd>v10, 2026년 10월</dd>
       </dl>
     </div>
     <div class="col-6">
@@ -782,12 +775,28 @@ requestAnimationFrame(frame);
   </section>
 
   <footer class="ds-foot">
-    <div>어항 · Fish Lamp v10</div>
-    <div>디자인 프로토타이핑 · 2026-2</div>
+    <div>어항 Fish Lamp v10</div>
+    <div>디자인 프로토타이핑 2026-2</div>
     <div>어항 Design System v1.0</div>
   </footer>
 
 </main>
 
+<script>
+(() => {
+  // 주소에 #process 가 남으면 다음 방문부터 그 위치에서 열린다. 해시를 쓰지 않고 이동한다.
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+  addEventListener('load', () => scrollTo(0, 0));
+  for (const a of document.querySelectorAll('a[href^="#"]')) {
+    a.addEventListener('click', (e) => {
+      const t = document.getElementById(a.getAttribute('href').slice(1));
+      if (!t) return;
+      e.preventDefault();
+      t.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    });
+  }
+})();
+</script>
 </body>
 </html>
