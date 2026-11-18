@@ -79,6 +79,10 @@
   .fl-title b { color: var(--fg-primary); font-weight: var(--weight-medium); }
 
   /* data/md — 실측 치수 */
+  .fl-sub { font-family: var(--font-text); font-size: var(--size-md);
+            font-weight: var(--weight-medium); letter-spacing: var(--tracking-heading);
+            line-height: var(--leading-snug); color: var(--fg-primary); margin-top: var(--space-2); }
+
   .fl-dims { font-family: var(--font-mono); font-size: var(--size-2xs);
              font-weight: var(--weight-regular); line-height: var(--leading-snug);
              color: var(--fg-muted); text-align: right; }
@@ -130,6 +134,7 @@
   @media (max-width: 768px) { /* md */
     .fl-bottom { flex-direction: column; align-items: flex-start; }
     .fl-dims { display: none; }
+    .fl-sub { font-size: var(--size-sm); }
   }
 
   /* §2.5 — reduced motion */
@@ -264,7 +269,10 @@
   <div id="fl-stage">
     <canvas id="fl-canvas"></canvas>
     <div class="fl-hud fl-top">
-      <div class="fl-title"><b>Fish Lamp</b> v10</div>
+      <div>
+        <div class="fl-title"><b>Fish Lamp</b> v10</div>
+        <div class="fl-sub">디자인프로토타입핑 12주차 과제</div>
+      </div>
       <div class="fl-dims" id="fl-dims">188.5 W × 90.8 D × 242.0 H mm</div>
     </div>
     <div class="fl-hint" id="fl-hint">scroll ↓</div>
@@ -516,28 +524,38 @@ const halo = (() => {
   scene.add(s); return s;
 })();
 
-/* 커서를 따라오는 배경 오브.
-   점등이 끝난 뒤에만 나타나고, 램프 빛과 같은 색, 같은 흔들림을 씁니다.
-   깊이는 램프보다 뒤라서 본체에 가려집니다. */
+/* 램프 주위를 떠다니는 빛 덩어리.
+   처음부터 보이고, 저마다 다른 주기로 자유롭게 흘러다닙니다.
+   커서가 움직이면 서로 다른 지연으로 따라오므로 하나의 궤적처럼 보입니다.
+   램프보다 뒤에 있는 것은 본체에 가려집니다. */
 const ORBS = (() => {
   const list = [];
   const N = 6;
   for (let i = 0; i < N; i++) {
     const sp = glowSprite();
-    sp.scale.setScalar(150 + i * 46);
-    sp.position.set(0, 120, -700);
+    sp.scale.setScalar(118 + i * 34);
     sp.renderOrder = -1;
     scene.add(sp);
+    // 여섯 개가 각자 다른 자리, 다른 속도, 다른 커서 반응을 가집니다.
+    // 같은 목표로 몰려가면 하나의 덩어리로 보이므로 값을 일부러 흩어 놓았습니다.
+    const PULL = [1.00, 0.72, 0.46, 0.88, 0.28, 0.60];   // 커서에 끌리는 정도
+    const LAG  = [3.10, 1.45, 0.85, 2.20, 0.55, 1.10];   // 따라붙는 속도
     list.push({
       sp,
-      lag: 2.6 - i * 0.33,                       // 뒤쪽 오브일수록 더 늦게 따라옵니다
-      off: [(i % 2 ? 1 : -1) * (40 + i * 46), ((i % 3) - 1) * 62, -i * 55],
-      pos: new THREE.Vector3(0, 120, -700),
-      amp: 0.16 - i * 0.017,
+      lag: LAG[i],
+      pull: PULL[i],
+      off: [(i % 2 ? 1 : -1) * (150 + i * 74), ((i % 3) - 1) * 150 + 40, (i % 2 ? 1 : -1) * (120 + i * 96)],
+      pos: new THREE.Vector3((i - 2.5) * 120, 140, -200),
+      amp: 0.62 - i * 0.052,
+      // 자유 유영: 축마다 다른 주기, 위상, 반경 — 공약수가 없어 궤적이 반복되지 않습니다
+      sw: [0.131 + i * 0.047, 0.097 + i * 0.039, 0.083 + i * 0.053],
+      ph: [i * 2.39, i * 1.77 + 0.9, i * 3.11 + 2.1],
+      rad: [150 + i * 44, 112 + i * 37, 130 + i * 41],
     });
   }
   return list;
 })();
+const orbHome = new THREE.Vector3();
 
 let ptrNDC = null;
 addEventListener('pointermove', (e) => {
@@ -573,22 +591,15 @@ function camAngles(p) {
   const l = CAM[CAM.length - 1]; return [l[1], l[2]];
 }
 
-/* 점등은 서서히 밝아지지 않습니다. 예열하듯 두세 번 깜빡인 뒤 한 번 확 올라왔다가
-   제 밝기로 가라앉습니다. 시간이 아니라 스크롤 위치에만 의존하므로 되감아도 같습니다. */
+/* 점등은 서서히 밝아지지 않습니다. 어둠에서 한 번에 확 올라왔다가 제 밝기로
+   가라앉습니다. 시간이 아니라 스크롤 위치에만 의존하므로 되감아도 같습니다. */
 const IGNITE_A = 0.84, IGNITE_B = 0.94;
 function ignition(p) {
   const q = clamp((p - IGNITE_A) / (IGNITE_B - IGNITE_A));
   if (q <= 0) return 0;
-  let v = 0;
-  for (const [a, b, amp] of [[0.02, 0.08, 0.20], [0.13, 0.19, 0.48], [0.25, 0.31, 0.26]]) {
-    if (q >= a && q < b) v = Math.max(v, amp * Math.sin(Math.PI * (q - a) / (b - a)));
-  }
-  if (q > 0.34) {
-    const rise = smooth(clamp((q - 0.34) / 0.20));
-    const settle = smooth(clamp((q - 0.54) / 0.46));
-    v = Math.max(v, rise * (1 + 0.70 * (1 - settle)));
-  }
-  return v;
+  const rise = smooth(clamp(q / 0.30));              // 어둠에서 한 번에 올라오고
+  const settle = smooth(clamp((q - 0.30) / 0.70));   // 넘긴 만큼 제 밝기로 가라앉습니다
+  return rise * (1 + 0.75 * (1 - settle));
 }
 
 /* 조립은 스크롤 앞 66%, 점등과 그 여운은 뒤 34%에 배분합니다. */
@@ -631,9 +642,9 @@ function apply(p, time) {
   // 점등
   const on = ignition(p);
   const flick = reduce ? 1 : 1 + 0.025 * Math.sin(time * 2.1) + 0.015 * Math.sin(time * 5.3);
-  MATS.light.emissiveIntensity = on * 2.8 * flick;
-  lampLight.intensity = on * 3.6 * flick;
-  halo.material.opacity = Math.min(0.75, on * 0.42 * flick);
+  MATS.light.emissiveIntensity = on * 1.7 * flick;
+  lampLight.intensity = on * 2.3 * flick;
+  halo.material.opacity = Math.min(0.58, on * 0.34 * flick);
   // 서지 순간에는 화면 전체가 한 번 들립니다
   renderer.toneMappingExposure = 1.05 + 0.34 * Math.max(0, on - 1);
 
@@ -651,21 +662,34 @@ function apply(p, time) {
   camera.position.set(camC.x + camD * Math.sin(a) * Math.cos(e), camC.y + camD * Math.sin(e), camC.z + camD * Math.cos(a) * Math.cos(e));
   camera.lookAt(camC);
 
-  // 커서를 따라오는 배경 오브: 점등이 자리잡은 뒤부터
-  const orbOn = smooth(clamp((p - 0.93) / 0.05));
-  if (orbOn > 0.001 && ptrNDC) {
+  // 램프 주위를 떠다니는 빛 덩어리. 처음부터 보이고, 커서가 있으면 그쪽으로 모입니다.
+  /* 밝기는 램프를 따릅니다. 점등 직전 어두워질 때 함께 잦아들었다가,
+     램프가 살아날 때 같이 터집니다. 그래야 점등의 대비가 죽지 않습니다. */
+  const orbFade = seg(p, 0.01, 0.10);
+  const orbGain = 0.62 * (1 - 0.85 * dusk) + 0.95 * on;
+  // 기본 자리는 램프 둘레입니다. 커서가 있으면 오브마다 제 몫만큼 그쪽으로 끌립니다.
+  const hasPtr = !!ptrNDC;
+  if (hasPtr) {
     orbRay.set(ptrNDC.x, ptrNDC.y, 0.5).unproject(camera).sub(camera.position).normalize();
-    orbWant.copy(camera.position).addScaledVector(orbRay, camD * 1.35);
-    for (const o of ORBS) {
-      const k = 1 - Math.exp(-o.lag * frameDt);
-      o.pos.x += (orbWant.x + o.off[0] - o.pos.x) * k;
-      o.pos.y += (orbWant.y + o.off[1] - o.pos.y) * k;
-      o.pos.z += (orbWant.z + o.off[2] - o.pos.z) * k;
+    orbWant.copy(camera.position).addScaledVector(orbRay, camD * 1.25);
+  }
+  for (const o of ORBS) {
+    // 각자의 정박 지점
+    orbHome.set(camC.x + o.off[0], camC.y + o.off[1], camC.z + o.off[2]);
+    if (hasPtr) orbHome.lerp(orbWant, o.pull);
+    const k = 1 - Math.exp(-o.lag * frameDt);
+    o.pos.x += (orbHome.x - o.pos.x) * k;
+    o.pos.y += (orbHome.y - o.pos.y) * k;
+    o.pos.z += (orbHome.z - o.pos.z) * k;
+    if (reduce) {
       o.sp.position.copy(o.pos);
-      o.sp.material.opacity = orbOn * o.amp * flick;
+    } else {
+      o.sp.position.set(
+        o.pos.x + Math.sin(time * o.sw[0] + o.ph[0]) * o.rad[0],
+        o.pos.y + Math.sin(time * o.sw[1] + o.ph[1]) * o.rad[1],
+        o.pos.z + Math.cos(time * o.sw[2] + o.ph[2]) * o.rad[2]);
     }
-  } else {
-    for (const o of ORBS) o.sp.material.opacity = 0;
+    o.sp.material.opacity = Math.min(1, orbFade * o.amp * orbGain * flick);
   }
 
   // HUD
@@ -711,6 +735,7 @@ function frame(now) {
 
 // 테스트 훅: ?p=0.6 으로 진행도 고정 / window.__fl 로 조회
 const q = new URLSearchParams(location.search);
+if (q.has('noorbs')) for (const o of ORBS) o.sp.visible = false;
 window.__fl = {
   setProgress(v) { target = cur = clamp(v); apply(cur, 0); renderer.render(scene, camera); },
   info() { return { parts: meshes.length, triangles: triTotal }; },
