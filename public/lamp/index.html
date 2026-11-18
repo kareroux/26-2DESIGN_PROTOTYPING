@@ -63,7 +63,7 @@
     font-family: var(--font-text);
   }
 
-  #fl-scrolly { position: relative; height: 620vh; }
+  #fl-scrolly { position: relative; height: 820vh; }
   #fl-stage { position: sticky; top: 0; height: 100svh; overflow: hidden; background: var(--bg-canvas); }
   #fl-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: pan-y; }
 
@@ -501,15 +501,52 @@ const lb = lightMesh.userData.box;
 const lampLight = new THREE.PointLight(0xffa850, 0, 420, 2);
 lampLight.position.set((lb.min.x + lb.max.x) / 2, (lb.min.z + lb.max.z) / 2 + 10, -((lb.min.y + lb.max.y) / 2) + 30);
 scene.add(lampLight);
-const halo = (() => {
+const GLOW_TEX = (() => {
   const c = document.createElement('canvas'); c.width = c.height = 128;
   const x = c.getContext('2d'), gr = x.createRadialGradient(64, 64, 0, 64, 64, 64);
   gr.addColorStop(0, 'rgba(255,190,110,.9)'); gr.addColorStop(.35, 'rgba(255,150,60,.28)'); gr.addColorStop(1, 'rgba(255,120,30,0)');
   x.fillStyle = gr; x.fillRect(0, 0, 128, 128);
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 }));
-  s.position.copy(lampLight.position); s.scale.setScalar(360);
+  return new THREE.CanvasTexture(c);
+})();
+const glowSprite = (scale) => new THREE.Sprite(new THREE.SpriteMaterial({
+  map: GLOW_TEX, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 }));
+
+const halo = (() => {
+  const s = glowSprite(); s.position.copy(lampLight.position); s.scale.setScalar(360);
   scene.add(s); return s;
 })();
+
+/* 커서를 따라오는 배경 오브.
+   점등이 끝난 뒤에만 나타나고, 램프 빛과 같은 색, 같은 흔들림을 씁니다.
+   깊이는 램프보다 뒤라서 본체에 가려집니다. */
+const ORBS = (() => {
+  const list = [];
+  const N = 6;
+  for (let i = 0; i < N; i++) {
+    const sp = glowSprite();
+    sp.scale.setScalar(150 + i * 46);
+    sp.position.set(0, 120, -700);
+    sp.renderOrder = -1;
+    scene.add(sp);
+    list.push({
+      sp,
+      lag: 2.6 - i * 0.33,                       // 뒤쪽 오브일수록 더 늦게 따라옵니다
+      off: [(i % 2 ? 1 : -1) * (40 + i * 46), ((i % 3) - 1) * 62, -i * 55],
+      pos: new THREE.Vector3(0, 120, -700),
+      amp: 0.16 - i * 0.017,
+    });
+  }
+  return list;
+})();
+
+let ptrNDC = null;
+addEventListener('pointermove', (e) => {
+  if (e.pointerType === 'touch') return;
+  const r = canvas.getBoundingClientRect();
+  ptrNDC = ptrNDC || new THREE.Vector2();
+  ptrNDC.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+}, { passive: true });
+const orbRay = new THREE.Vector3(), orbWant = new THREE.Vector3();
 
 /* =====================================================================
    4) 스크롤 타임라인
@@ -536,13 +573,37 @@ function camAngles(p) {
   const l = CAM[CAM.length - 1]; return [l[1], l[2]];
 }
 
+/* 점등은 서서히 밝아지지 않습니다. 예열하듯 두세 번 깜빡인 뒤 한 번 확 올라왔다가
+   제 밝기로 가라앉습니다. 시간이 아니라 스크롤 위치에만 의존하므로 되감아도 같습니다. */
+const IGNITE_A = 0.84, IGNITE_B = 0.94;
+function ignition(p) {
+  const q = clamp((p - IGNITE_A) / (IGNITE_B - IGNITE_A));
+  if (q <= 0) return 0;
+  let v = 0;
+  for (const [a, b, amp] of [[0.02, 0.08, 0.20], [0.13, 0.19, 0.48], [0.25, 0.31, 0.26]]) {
+    if (q >= a && q < b) v = Math.max(v, amp * Math.sin(Math.PI * (q - a) / (b - a)));
+  }
+  if (q > 0.34) {
+    const rise = smooth(clamp((q - 0.34) / 0.20));
+    const settle = smooth(clamp((q - 0.54) / 0.46));
+    v = Math.max(v, rise * (1 + 0.70 * (1 - settle)));
+  }
+  return v;
+}
+
+/* 조립은 스크롤 앞 66%, 점등과 그 여운은 뒤 34%에 배분합니다. */
+const SPLIT_S = 0.66, SPLIT_P = 0.83;
+const stretch = (x) => x <= SPLIT_S ? x / SPLIT_S * SPLIT_P
+                                    : SPLIT_P + (x - SPLIT_S) / (1 - SPLIT_S) * (1 - SPLIT_P);
+
 let target = 0, cur = 0, camC = new THREE.Vector3(0, 120, 0), camD = 900, camInit = false;
+let frameDt = 1 / 60;
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const tmpBox = new THREE.Box3(), tmpC = new THREE.Vector3(), tmpS = new THREE.Vector3();
 
 function readScroll() {
   const r = sec.getBoundingClientRect();
-  target = clamp(-r.top / Math.max(1, r.height - innerHeight));
+  target = stretch(clamp(-r.top / Math.max(1, r.height - innerHeight)));
 }
 
 function apply(p, time) {
@@ -557,12 +618,24 @@ function apply(p, time) {
     tmpBox.expandByPoint(tmpS.set(box.min.x + m.position.x, box.min.y + m.position.y, box.min.z + m.position.z));
     tmpBox.expandByPoint(tmpS.set(box.max.x + m.position.x, box.max.y + m.position.y, box.max.z + m.position.z));
   }
+  // 점등 직전에 주변광을 떨어뜨립니다. 방이 어두워져야 램프가 켜지는 것이 보입니다.
+  const dusk = seg(p, 0.74, 0.85);
+  key.intensity = 0.9 * (1 - 0.86 * dusk);
+  const envK = 1 - 0.82 * dusk;
+  MATS.alu.envMapIntensity   = 1.7 * envK;
+  MATS.dark.envMapIntensity  = 0.6 * envK;
+  MATS.cream.envMapIntensity = 0.9 * envK;
+  MATS.slate.envMapIntensity = 0.9 * envK;
+  MATS.light.envMapIntensity = 0.9 * envK;
+
   // 점등
-  const on = seg(p, 0.86, 0.97);
+  const on = ignition(p);
   const flick = reduce ? 1 : 1 + 0.025 * Math.sin(time * 2.1) + 0.015 * Math.sin(time * 5.3);
-  MATS.light.emissiveIntensity = on * 0.8 * flick;
-  lampLight.intensity = on * 1.1 * flick;
-  halo.material.opacity = on * 0.22 * flick;
+  MATS.light.emissiveIntensity = on * 2.8 * flick;
+  lampLight.intensity = on * 3.6 * flick;
+  halo.material.opacity = Math.min(0.75, on * 0.42 * flick);
+  // 서지 순간에는 화면 전체가 한 번 들립니다
+  renderer.toneMappingExposure = 1.05 + 0.34 * Math.max(0, on - 1);
 
   // 카메라: 현재 파트 묶음의 경계구에 맞춰 거리 자동 (조립 좌표 → Three 좌표)
   const cx = (tmpBox.min.x + tmpBox.max.x) / 2, cy = (tmpBox.min.y + tmpBox.max.y) / 2, cz = (tmpBox.min.z + tmpBox.max.z) / 2;
@@ -578,8 +651,25 @@ function apply(p, time) {
   camera.position.set(camC.x + camD * Math.sin(a) * Math.cos(e), camC.y + camD * Math.sin(e), camC.z + camD * Math.cos(a) * Math.cos(e));
   camera.lookAt(camC);
 
+  // 커서를 따라오는 배경 오브: 점등이 자리잡은 뒤부터
+  const orbOn = smooth(clamp((p - 0.93) / 0.05));
+  if (orbOn > 0.001 && ptrNDC) {
+    orbRay.set(ptrNDC.x, ptrNDC.y, 0.5).unproject(camera).sub(camera.position).normalize();
+    orbWant.copy(camera.position).addScaledVector(orbRay, camD * 1.35);
+    for (const o of ORBS) {
+      const k = 1 - Math.exp(-o.lag * frameDt);
+      o.pos.x += (orbWant.x + o.off[0] - o.pos.x) * k;
+      o.pos.y += (orbWant.y + o.off[1] - o.pos.y) * k;
+      o.pos.z += (orbWant.z + o.off[2] - o.pos.z) * k;
+      o.sp.position.copy(o.pos);
+      o.sp.material.opacity = orbOn * o.amp * flick;
+    }
+  } else {
+    for (const o of ORBS) o.sp.material.opacity = 0;
+  }
+
   // HUD
-  const stepIdx = p < 0.05 ? 0 : p < 0.19 ? 1 : p < 0.33 ? 2 : p < 0.52 ? 3 : p < 0.59 ? 4 : p < 0.69 ? 5 : p < 0.83 ? 6 : 7;
+  const stepIdx = p < 0.05 ? 0 : p < 0.19 ? 1 : p < 0.33 ? 2 : p < 0.52 ? 3 : p < 0.59 ? 4 : p < 0.69 ? 5 : p < 0.84 ? 6 : 7;
   el.no.textContent = String(stepIdx).padStart(2, '0') + ' / 07';
   el.name.textContent = STEPS[stepIdx][0];
   el.desc.textContent = STEPS[stepIdx][1];
@@ -612,7 +702,7 @@ let last = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
   if (!visible) { last = now; return; }
-  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  const dt = Math.min(0.1, (now - last) / 1000); last = now; frameDt = dt;
   cur += (target - cur) * Math.min(1, dt * 7);
   if (Math.abs(target - cur) < 1e-4) cur = target;
   apply(cur, now / 1000);
